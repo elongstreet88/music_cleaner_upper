@@ -14,21 +14,15 @@ interface PreviewRow {
   id: string;
   artist: string;
   album: string;
-  trackLabel: string;
   song: string;
-  sourceFileName: string;
-  outputRelativePath: string;
+  outputDisplayPath: string;
   changes: ReturnType<typeof getTrackChanges>;
   searchText: string;
 }
 
-function buildOutputRelativePath(outputFolder: string, relativePath: string): string {
-  const trimmedOutputFolder = outputFolder.trim();
-  if (trimmedOutputFolder.length === 0) {
-    return relativePath;
-  }
-
-  return `${trimmedOutputFolder.replace(/\/+$/, '')}/${relativePath}`;
+function buildOutputDisplayPath(relativePath: string): string {
+  const normalizedRelativePath = relativePath.replace(/^\/+/, '');
+  return `./{out}/${normalizedRelativePath}`;
 }
 
 function renderValue(value: string): string {
@@ -43,26 +37,22 @@ export function MetadataPreview({ importResult, outputFormat, prefixTrackNumbers
     return (importResult?.albums ?? []).flatMap((album) => {
       return album.tracks.map((track) => {
         const changes = getTrackChanges(track, outputFormat, prefixTrackNumbers);
-        const outputRelativePath = buildOutputRelativePath(outputFolder, getPreviewRelativePath(track, outputFormat, prefixTrackNumbers));
-        const trackLabel = `${track.discNumber}.${String(track.trackNumber).padStart(2, '0')}`;
+        const outputDisplayPath = buildOutputDisplayPath(getPreviewRelativePath(track, outputFormat, prefixTrackNumbers));
 
         return {
           id: track.id,
           artist: album.canonicalArtist,
           album: album.canonicalAlbum,
-          trackLabel,
           song: track.canonicalTitle,
-          sourceFileName: track.sourceFileName,
-          outputRelativePath,
+          outputDisplayPath,
           changes,
           searchText: [
             album.canonicalArtist,
             album.canonicalAlbum,
             track.canonicalTitle,
             track.title,
-            trackLabel,
             track.sourceFileName,
-            outputRelativePath,
+            outputDisplayPath,
             ...changes.flatMap((change) => [change.field, change.before, change.after]),
           ]
             .join(' ')
@@ -70,7 +60,7 @@ export function MetadataPreview({ importResult, outputFormat, prefixTrackNumbers
         } satisfies PreviewRow;
       });
     });
-  }, [importResult, outputFolder, outputFormat, prefixTrackNumbers]);
+  }, [importResult, outputFormat, prefixTrackNumbers]);
 
   const filteredRows = useMemo(() => {
     const normalizedSearch = deferredSearchQuery.trim().toLowerCase();
@@ -119,6 +109,7 @@ export function MetadataPreview({ importResult, outputFormat, prefixTrackNumbers
               <th className="px-3 py-2 font-medium">Artist</th>
               <th className="px-3 py-2 font-medium">Album</th>
               <th className="px-3 py-2 font-medium">Song</th>
+              <th className="px-3 py-2 font-medium">Path</th>
               <th className="px-3 py-2 font-medium">Changes</th>
             </tr>
           </thead>
@@ -128,14 +119,8 @@ export function MetadataPreview({ importResult, outputFormat, prefixTrackNumbers
               <tr className="border-b border-base-300/70 align-top" key={row.id}>
                 <td className="px-3 py-2.5 text-[11px] font-semibold leading-5 text-base-content">{row.artist}</td>
                 <td className="px-3 py-2.5 text-[11px] leading-5 text-base-content/80">{row.album}</td>
-                <td className="px-3 py-2.5">
-                  <div className="flex flex-wrap items-center gap-2 text-[11px] leading-5 text-base-content">
-                    <span className="badge badge-ghost badge-xs">{row.trackLabel}</span>
-                    <span className="font-medium">{row.song}</span>
-                  </div>
-                  <div className="mt-1 break-all font-mono text-[10px] leading-4 text-base-content/45">{row.sourceFileName}</div>
-                  <div className="mt-1 break-all font-mono text-[10px] leading-4 text-base-content/35">{row.outputRelativePath}</div>
-                </td>
+                <td className="px-3 py-2.5 text-[11px] leading-5 text-base-content"><span className="font-medium">{row.song}</span></td>
+                <td className="px-3 py-2.5"><div className="break-all font-mono text-[10px] leading-4 text-base-content/45">{row.outputDisplayPath}</div></td>
                 <td className="px-3 py-2.5">
                   {row.changes.length === 0 ? (
                     <span className="inline-flex rounded-full border border-base-300 bg-base-200/60 px-2 py-1 text-[10px] leading-4 text-base-content/45">No changes</span>
