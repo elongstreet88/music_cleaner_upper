@@ -1,0 +1,17 @@
+{
+  "name": "music-cleaner-upper",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/server",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "concurrently --names server,web \"npm run dev -w @music-cleaner-upper/server\" \"npm run dev -w @music-cleaner-upper/web\"",
+    "build": "npm run build -w @music-cleaner-upper/server && npm run build -w @music-cleaner-upper/web",
+    "test": "npm run test -w @music-cleaner-upper/server"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  }
+}
