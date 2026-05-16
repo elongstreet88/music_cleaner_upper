@@ -10,29 +10,19 @@ interface MetadataPreviewProps {
   outputFolder: string;
 }
 
-interface TrackReviewRow {
+interface PreviewRow {
   id: string;
+  artist: string;
+  album: string;
   trackLabel: string;
-  title: string;
+  song: string;
   sourceFileName: string;
   outputRelativePath: string;
-  outputFullPath: string;
   changes: ReturnType<typeof getTrackChanges>;
   searchText: string;
 }
 
-interface AlbumReviewGroup {
-  id: string;
-  artistAlbum: string;
-  sourceArtistAlbum: string;
-  matched: boolean;
-  metadataLookupError?: string;
-  changedTrackCount: number;
-  tracks: TrackReviewRow[];
-  searchText: string;
-}
-
-function buildFullOutputPath(outputFolder: string, relativePath: string): string {
+function buildOutputRelativePath(outputFolder: string, relativePath: string): string {
   const trimmedOutputFolder = outputFolder.trim();
   if (trimmedOutputFolder.length === 0) {
     return relativePath;
@@ -41,205 +31,134 @@ function buildFullOutputPath(outputFolder: string, relativePath: string): string
   return `${trimmedOutputFolder.replace(/\/+$/, '')}/${relativePath}`;
 }
 
+function renderValue(value: string): string {
+  return value.trim().length > 0 ? value : 'Empty';
+}
+
 export function MetadataPreview({ importResult, outputFormat, prefixTrackNumbers, outputFolder }: MetadataPreviewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const deferredSearchQuery = useDeferredValue(searchQuery);
 
-  const albumGroups = useMemo<AlbumReviewGroup[]>(() => {
-    return (importResult?.albums ?? []).map((album) => {
-      const tracks = album.tracks.map((track) => {
+  const rows = useMemo<PreviewRow[]>(() => {
+    return (importResult?.albums ?? []).flatMap((album) => {
+      return album.tracks.map((track) => {
         const changes = getTrackChanges(track, outputFormat, prefixTrackNumbers);
-        const outputRelativePath = getPreviewRelativePath(track, outputFormat, prefixTrackNumbers);
-        const outputFullPath = buildFullOutputPath(outputFolder, outputRelativePath);
+        const outputRelativePath = buildOutputRelativePath(outputFolder, getPreviewRelativePath(track, outputFormat, prefixTrackNumbers));
         const trackLabel = `${track.discNumber}.${String(track.trackNumber).padStart(2, '0')}`;
-        const searchText = [
-          album.canonicalArtist,
-          album.canonicalAlbum,
-          album.artist,
-          album.album,
-          trackLabel,
-          track.title,
-          track.canonicalTitle,
-          track.sourceFileName,
-          outputRelativePath,
-          outputFullPath,
-          ...changes.flatMap((change) => [change.field, change.before, change.after]),
-        ]
-          .join(' ')
-          .toLowerCase();
 
         return {
           id: track.id,
+          artist: album.canonicalArtist,
+          album: album.canonicalAlbum,
           trackLabel,
-          title: track.canonicalTitle,
+          song: track.canonicalTitle,
           sourceFileName: track.sourceFileName,
           outputRelativePath,
-          outputFullPath,
           changes,
-          searchText,
-        } satisfies TrackReviewRow;
+          searchText: [
+            album.canonicalArtist,
+            album.canonicalAlbum,
+            track.canonicalTitle,
+            track.title,
+            trackLabel,
+            track.sourceFileName,
+            outputRelativePath,
+            ...changes.flatMap((change) => [change.field, change.before, change.after]),
+          ]
+            .join(' ')
+            .toLowerCase(),
+        } satisfies PreviewRow;
       });
-
-      return {
-        id: album.id,
-        artistAlbum: `${album.canonicalArtist} / ${album.canonicalAlbum}`,
-        sourceArtistAlbum: `${album.artist} / ${album.album}`,
-        matched: Boolean(album.releaseMatch),
-        metadataLookupError: album.metadataLookupError,
-        changedTrackCount: tracks.filter((track) => track.changes.length > 0).length,
-        tracks,
-        searchText: [
-          album.canonicalArtist,
-          album.canonicalAlbum,
-          album.artist,
-          album.album,
-          album.metadataLookupError ?? '',
-          ...tracks.map((track) => track.searchText),
-        ]
-          .join(' ')
-          .toLowerCase(),
-      } satisfies AlbumReviewGroup;
     });
   }, [importResult, outputFolder, outputFormat, prefixTrackNumbers]);
 
-  const filteredAlbums = useMemo(() => {
+  const filteredRows = useMemo(() => {
     const normalizedSearch = deferredSearchQuery.trim().toLowerCase();
     if (normalizedSearch.length === 0) {
-      return albumGroups;
+      return rows;
     }
 
-    return albumGroups
-      .map((album) => ({
-        ...album,
-        tracks: album.tracks.filter((track) => track.searchText.includes(normalizedSearch)),
-      }))
-      .filter((album) => album.searchText.includes(normalizedSearch) || album.tracks.length > 0);
-  }, [albumGroups, deferredSearchQuery]);
+    return rows.filter((row) => row.searchText.includes(normalizedSearch));
+  }, [rows, deferredSearchQuery]);
 
-  const visibleTrackCount = filteredAlbums.reduce((count, album) => count + album.tracks.length, 0);
-  const changedTrackCount = albumGroups.reduce((count, album) => count + album.changedTrackCount, 0);
+  const changedRowCount = filteredRows.filter((row) => row.changes.length > 0).length;
 
   if (!importResult) {
     return (
-      <div className="rounded-box border border-dashed border-base-300 bg-base-200/40 p-6 text-sm text-base-content/60">
-        Pull metadata to populate album groups. Each album shows only the fields that will actually change plus the exact destination path for every track.
+      <div className="rounded-[26px] border border-dashed border-base-300 bg-base-200/35 p-6 text-sm text-base-content/60">
+        Pull metadata in Step 2 to populate the review table.
       </div>
     );
   }
 
   return (
-    <div className="overflow-hidden rounded-box border border-base-300 bg-base-100">
-      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-base-300 p-4">
-        <label className="form-control w-full max-w-xl">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden rounded-[26px] border border-base-300 bg-base-100">
+      <div className="flex flex-wrap items-end justify-between gap-3 border-b border-base-300 px-4 py-3">
+        <label className="form-control w-full max-w-md">
           <div className="label py-0">
-            <span className="label-text text-xs">Search albums or tracks</span>
+            <span className="label-text text-[11px] uppercase tracking-[0.14em] text-base-content/45">Search</span>
           </div>
           <input
             className="input input-bordered input-sm"
             value={searchQuery}
             onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search artist, album, track, source file, changed value, or destination"
+            placeholder="Search artist, album, song, file name, or change text"
           />
         </label>
 
-        <div className="flex flex-wrap items-center gap-2 text-xs text-base-content/60">
-          <span>{filteredAlbums.length} of {albumGroups.length} albums shown</span>
-          <span>{visibleTrackCount} track{visibleTrackCount === 1 ? '' : 's'} visible</span>
-          <span className="badge badge-info badge-outline badge-sm">{changedTrackCount} changed tracks</span>
+        <div className="flex flex-wrap items-center gap-2 text-[11px] text-base-content/55">
+          <span>{filteredRows.length} of {rows.length} tracks shown</span>
+          <span className="badge badge-info badge-outline badge-sm">{changedRowCount} changed</span>
         </div>
       </div>
 
-      <div className="max-h-[48rem] space-y-4 overflow-auto p-4">
-        {filteredAlbums.map((album) => (
-          <section className="rounded-box border border-base-300 bg-base-200/50" key={album.id}>
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-3">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-base font-semibold">{album.artistAlbum}</h3>
-                  <span className={`badge badge-sm ${album.matched ? 'badge-success badge-outline' : 'badge-warning badge-outline'}`}>
-                    {album.matched ? 'matched' : 'local'}
-                  </span>
-                  <span className="badge badge-ghost badge-sm">{album.tracks.length} tracks</span>
-                  <span className="badge badge-info badge-outline badge-sm">{album.changedTrackCount} changed</span>
-                </div>
-                {album.sourceArtistAlbum !== album.artistAlbum ? (
-                  <p className="mt-1 text-xs text-base-content/55">Source tags: {album.sourceArtistAlbum}</p>
-                ) : null}
-              </div>
+      <div className="min-h-0 overflow-auto">
+        <table className="w-full border-collapse text-xs">
+          <thead className="sticky top-0 z-10 bg-base-200/96 backdrop-blur">
+            <tr className="border-b border-base-300 text-left text-[11px] uppercase tracking-[0.14em] text-base-content/45">
+              <th className="px-3 py-2 font-medium">Artist</th>
+              <th className="px-3 py-2 font-medium">Album</th>
+              <th className="px-3 py-2 font-medium">Song</th>
+              <th className="px-3 py-2 font-medium">Changes</th>
+            </tr>
+          </thead>
 
-              {album.metadataLookupError ? (
-                <div className="rounded-box border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-content/80">
-                  Metadata lookup still failing: {album.metadataLookupError}
-                </div>
-              ) : null}
-            </div>
-
-            <div className="space-y-3 p-4">
-              {album.tracks.map((track) => (
-                <article className="rounded-box border border-base-300 bg-base-100/80 p-4" key={track.id}>
-                  <div className="grid gap-4 xl:grid-cols-[0.9fr_1.2fr_1.2fr]">
-                    <div className="space-y-3">
-                      <div>
-                        <div className="text-sm font-semibold">{track.trackLabel} · {track.title}</div>
-                        <div className="mt-2 rounded-box border border-base-300 bg-base-200/50 px-3 py-2">
-                          <div className="text-[11px] uppercase tracking-[0.12em] text-base-content/45">Source file</div>
-                          <div className="mt-1 break-all font-mono text-xs text-base-content/75">{track.sourceFileName}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.12em] text-base-content/45">Source file changes</div>
-                      {track.changes.length === 0 ? (
-                        <div className="mt-2 rounded-box border border-dashed border-base-300 bg-base-200/30 px-4 py-3 text-sm text-base-content/55">
-                          No metadata changes for this track.
-                        </div>
-                      ) : (
-                        <div className="mt-2 space-y-3">
-                          {track.changes.map((change) => (
-                            <div className="rounded-box border border-base-300 bg-base-200/45 p-3" key={`${track.id}-${change.field}`}>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="badge badge-outline badge-primary badge-sm">{change.field}</span>
-                                <span className="text-xs text-base-content/45">Only shown because it is changing</span>
-                              </div>
-                              <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                <div>
-                                  <div className="text-[11px] uppercase tracking-[0.12em] text-base-content/45">Current</div>
-                                  <div className="mt-1 break-words text-sm text-error/80">{change.before}</div>
-                                </div>
-                                <div>
-                                  <div className="text-[11px] uppercase tracking-[0.12em] text-base-content/45">Will write</div>
-                                  <div className="mt-1 break-words text-sm text-success">{change.after}</div>
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <div className="text-[11px] uppercase tracking-[0.12em] text-base-content/45">Destination</div>
-                      <div className="mt-2 rounded-box border border-success/20 bg-success/5 p-3">
-                        <div className="text-[11px] uppercase tracking-[0.12em] text-base-content/45">Full destination</div>
-                        <div className="mt-2 break-all font-mono text-sm leading-6 text-base-content">{track.outputFullPath}</div>
-                        <div className="mt-3 border-t border-success/10 pt-3">
-                          <div className="text-[11px] uppercase tracking-[0.12em] text-base-content/45">Relative inside output folder</div>
-                          <div className="mt-1 break-all font-mono text-xs text-base-content/65">{track.outputRelativePath}</div>
-                        </div>
-                      </div>
-                    </div>
+          <tbody>
+            {filteredRows.map((row) => (
+              <tr className="border-b border-base-300/70 align-top" key={row.id}>
+                <td className="px-3 py-2.5 text-[11px] font-semibold leading-5 text-base-content">{row.artist}</td>
+                <td className="px-3 py-2.5 text-[11px] leading-5 text-base-content/80">{row.album}</td>
+                <td className="px-3 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] leading-5 text-base-content">
+                    <span className="badge badge-ghost badge-xs">{row.trackLabel}</span>
+                    <span className="font-medium">{row.song}</span>
                   </div>
-                </article>
-              ))}
-            </div>
-          </section>
-        ))}
+                  <div className="mt-1 break-all font-mono text-[10px] leading-4 text-base-content/45">{row.sourceFileName}</div>
+                  <div className="mt-1 break-all font-mono text-[10px] leading-4 text-base-content/35">{row.outputRelativePath}</div>
+                </td>
+                <td className="px-3 py-2.5">
+                  {row.changes.length === 0 ? (
+                    <span className="inline-flex rounded-full border border-base-300 bg-base-200/60 px-2 py-1 text-[10px] leading-4 text-base-content/45">No changes</span>
+                  ) : (
+                    <div className="flex flex-wrap gap-1.5">
+                      {row.changes.map((change) => (
+                        <span className="inline-flex max-w-full flex-wrap items-center gap-1 rounded-full border border-base-300 bg-base-200/60 px-2 py-1 text-[10px] leading-4" key={`${row.id}-${change.field}`}>
+                          <span className="font-semibold uppercase tracking-[0.08em] text-base-content/55">{change.field}:</span>
+                          <span className="text-error/80 line-through">{renderValue(change.before)}</span>
+                          <span className="text-base-content/30">-&gt;</span>
+                          <span className="text-success">{renderValue(change.after)}</span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-        {filteredAlbums.length === 0 ? (
-          <div className="rounded-box border border-dashed border-base-300 bg-base-200/40 p-6 text-center text-sm text-base-content/55">
-            No albums or tracks matched that search.
-          </div>
+        {filteredRows.length === 0 ? (
+          <div className="p-6 text-center text-sm text-base-content/55">No tracks matched that search.</div>
         ) : null}
       </div>
     </div>

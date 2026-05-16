@@ -92,8 +92,8 @@ export function PathPicker({
   }
 
   return (
-    <section className="rounded-box border border-base-300 bg-base-200/60 p-3">
-      <div className="flex items-start justify-between gap-3">
+    <section className="rounded-2xl border border-base-300 bg-base-200/55 p-2.5">
+      <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
           <h3 className="text-sm font-semibold text-base-content">{label}</h3>
           <p className="text-xs text-base-content/60">{description}</p>
@@ -103,7 +103,7 @@ export function PathPicker({
         </button>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2 md:flex-row">
+      <div className="mt-2 flex flex-col gap-2 md:flex-row">
         <input
           aria-label={label}
           className="input input-bordered input-sm w-full font-mono text-xs"
@@ -119,7 +119,7 @@ export function PathPicker({
       </div>
 
       {browserOpen ? (
-        <div className="mt-3 rounded-box border border-base-300 bg-base-100/70 p-3">
+        <div className="mt-2 rounded-2xl border border-base-300 bg-base-100/72 p-2.5">
           <div className="flex flex-wrap gap-2">
             {breadcrumbs.map((breadcrumb, index) => (
               <button
@@ -162,7 +162,7 @@ export function PathPicker({
           {browseQuery.isLoading ? <p className="mt-2 text-xs text-base-content/60">Loading folder contents…</p> : null}
           {browseQuery.isError ? <p className="mt-2 text-xs text-error">{browseQuery.error.message}</p> : null}
 
-          <div className="mt-3 grid gap-2">
+          <div className="mt-3 grid max-h-64 gap-2 overflow-auto pr-1">
             {browseQuery.data?.entries.map((entry) => {
               const disabled = directoriesOnly && entry.kind === 'file';
               const selected = entry.path === selectedEntryPath;
