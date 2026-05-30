@@ -441,11 +441,14 @@ function buildImportedAlbum(
   release: CanonicalRelease | null,
   metadataLookupError?: string,
 ): ImportedAlbum {
+  const canonicalAlbumArtist = release?.artist || sourceAlbum.artist;
+  const canonicalAlbumTitle = release?.title || sourceAlbum.album;
+
   const importedTracks = addTrackTotals(
     sourceAlbum.tracks.map((track) => {
       const canonicalTrack = findCanonicalTrack(release, track);
-      const canonicalArtist = canonicalTrack?.artist || release?.artist || track.artist;
-      const canonicalAlbum = release?.title || track.album;
+      const canonicalArtist = canonicalTrack?.artist || canonicalAlbumArtist || track.artist;
+      const canonicalAlbum = canonicalAlbumTitle;
       const canonicalTitle = canonicalTrack?.title || track.title;
 
       return {
@@ -468,8 +471,8 @@ function buildImportedAlbum(
         year: release?.year ?? track.year ?? sourceAlbum.year,
         genre: track.genre ?? sourceAlbum.genre,
         destinationRelativePath: buildDestinationRelativePath({
-          artist: canonicalArtist,
-          album: canonicalAlbum,
+          artist: canonicalAlbumArtist,
+          album: canonicalAlbumTitle,
           title: canonicalTitle,
           trackNumber: track.trackNumber,
           discNumber: track.discNumber,
@@ -485,8 +488,8 @@ function buildImportedAlbum(
     sourcePath: sourceAlbum.sourcePath,
     artist: sourceAlbum.artist,
     album: sourceAlbum.album,
-    canonicalArtist: release?.artist || sourceAlbum.artist,
-    canonicalAlbum: release?.title || sourceAlbum.album,
+    canonicalArtist: canonicalAlbumArtist,
+    canonicalAlbum: canonicalAlbumTitle,
     year: release?.year ?? sourceAlbum.year,
     genre: sourceAlbum.genre,
     totalDiscs: sourceAlbum.totalDiscs,

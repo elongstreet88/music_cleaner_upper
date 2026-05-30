@@ -45,6 +45,92 @@ describe('importSource', () => {
     expect(result.albums[0]?.tracks.some((track) => track.title === 'I’m Happy')).toBe(true);
   });
 
+  it('keeps one album folder when release tracks include featured artists', async () => {
+    const albums: ImportedAlbum[] = [
+      {
+        id: 'imagine-dragons-album',
+        sourcePath: '/tmp/imagine-dragons',
+        artist: 'Imagine Dragons',
+        album: 'Mercury – Acts 1 & 2',
+        canonicalArtist: 'Imagine Dragons',
+        canonicalAlbum: 'Mercury – Acts 1 & 2',
+        year: 2022,
+        totalDiscs: 2,
+        releaseMatch: null,
+        metadataLookupError: 'previous lookup failed',
+        tracks: [
+          {
+            id: 'enemy-track',
+            sourcePath: '/tmp/imagine-dragons/disc-1/enemy.flac',
+            sourceFileName: 'enemy.flac',
+            extension: '.flac',
+            discNumber: 1,
+            totalDiscs: 2,
+            trackNumber: 1,
+            totalTracks: 14,
+            title: 'Enemy',
+            artist: 'Imagine Dragons',
+            album: 'Mercury – Acts 1 & 2',
+            canonicalTitle: 'Enemy',
+            canonicalArtist: 'Imagine Dragons',
+            canonicalAlbum: 'Mercury – Acts 1 & 2',
+            year: 2022,
+            destinationRelativePath: 'Imagine Dragons/Mercury – Acts 1 & 2/Disc 1/01 - Enemy.flac',
+          },
+          {
+            id: 'continual-track',
+            sourcePath: '/tmp/imagine-dragons/disc-2/continual.flac',
+            sourceFileName: 'continual.flac',
+            extension: '.flac',
+            discNumber: 2,
+            totalDiscs: 2,
+            trackNumber: 16,
+            totalTracks: 18,
+            title: 'Continual',
+            artist: 'Imagine Dragons',
+            album: 'Mercury – Acts 1 & 2',
+            canonicalTitle: 'Continual',
+            canonicalArtist: 'Imagine Dragons',
+            canonicalAlbum: 'Mercury – Acts 1 & 2',
+            year: 2022,
+            destinationRelativePath: 'Imagine Dragons/Mercury – Acts 1 & 2/Disc 2/16 - Continual.flac',
+          },
+        ],
+      },
+    ];
+
+    const result = await retryMetadataForImportedAlbums('/tmp/source', albums, {
+      releaseLookup: async () => ({
+        id: 'mercury-release',
+        title: 'Mercury – Acts 1 & 2',
+        artist: 'Imagine Dragons',
+        score: 100,
+        year: 2022,
+        sourceUrl: 'https://musicbrainz.org/release/mercury-release',
+        tracks: [
+          { discNumber: 1, trackNumber: 1, title: 'Enemy', artist: 'Imagine Dragons with JID' },
+          { discNumber: 2, trackNumber: 16, title: 'Continual', artist: 'Imagine Dragons feat. Cory Henry' },
+        ],
+      }),
+    });
+
+    expect(result.albums).toHaveLength(1);
+    expect(result.albums[0]?.canonicalArtist).toBe('Imagine Dragons');
+    expect(result.albums[0]?.tracks.every((track) => track.destinationRelativePath.startsWith('Imagine Dragons/Mercury – Acts 1 & 2/'))).toBe(true);
+    expect(result.albums[0]?.tracks.find((track) => track.id === 'enemy-track')).toEqual(
+      expect.objectContaining({
+        canonicalArtist: 'Imagine Dragons with JID',
+        destinationRelativePath: 'Imagine Dragons/Mercury – Acts 1 & 2/Disc 1/01 - Enemy.flac',
+      }),
+    );
+    expect(result.albums[0]?.tracks.find((track) => track.id === 'continual-track')).toEqual(
+      expect.objectContaining({
+        canonicalArtist: 'Imagine Dragons feat. Cory Henry',
+        destinationRelativePath: 'Imagine Dragons/Mercury – Acts 1 & 2/Disc 2/16 - Continual.flac',
+      }),
+    );
+  });
+
   it('matches tagged files even when the source filenames are junk', async () => {
     const tempRoot = await mkdtemp(resolve(tmpdir(), 'music-cleaner-upper-bad-names-'));
     const messyDropPath = resolve(tempRoot, 'downloads', 'totally-unsorted-drop');
